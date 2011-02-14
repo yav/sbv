@@ -18,7 +18,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 module Data.SBV.BitVectors.Data
- ( SBool, SWord8, SWord16, SWord32, SWord64
+ ( SBool, SWord8, SWord16, SWord32, SWord64, SBit
  , SInt8, SInt16, SInt32, SInt64
  , SymWord(..)
  , CW, cwVal, cwSameType, cwIsBit, cwToBool
@@ -39,6 +39,7 @@ import Control.Monad.Trans             (MonadIO, liftIO)
 import Data.Char                       (isAlpha, isAlphaNum)
 import Data.Int                        (Int8, Int16, Int32, Int64)
 import Data.Word                       (Word8, Word16, Word32, Word64)
+import Data.Bit
 import Data.IORef                      (IORef, newIORef, modifyIORef, readIORef, writeIORef)
 import Data.List                       (intercalate, sortBy)
 
@@ -49,6 +50,8 @@ import qualified Data.Sequence as S    (Seq, empty, (|>))
 
 import System.IO.Unsafe                (unsafePerformIO) -- see the note at the bottom of the file
 import Test.QuickCheck                 (Testable(..))
+
+import GHC.TypeNats
 
 
 -- | 'CW' represents a concrete word of a fixed size:
@@ -133,6 +136,9 @@ instance HasSignAndSize Int32  where {sizeOf _ = 32; hasSign _ = True }
 instance HasSignAndSize Word32 where {sizeOf _ = 32; hasSign _ = False}
 instance HasSignAndSize Int64  where {sizeOf _ = 64; hasSign _ = True }
 instance HasSignAndSize Word64 where {sizeOf _ = 64; hasSign _ = False}
+instance NatI n => HasSignAndSize (Bit n) where
+  sizeOf    = numBitSize
+  hasSign _ = False
 
 liftCW :: (Integer -> b) -> CW -> b
 liftCW f x = f (cwVal x)
@@ -319,6 +325,8 @@ data SBV a = SBV !(Bool, Size) !(Either CW (Cached SW))
 
 -- | A symbolic boolean/bit
 type SBool   = SBV Bool
+
+type SBit n  = SBV (Bit n)
 
 -- | 8-bit unsigned symbolic value
 type SWord8  = SBV Word8

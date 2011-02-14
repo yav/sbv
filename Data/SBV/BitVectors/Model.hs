@@ -34,6 +34,8 @@ import Test.QuickCheck (Arbitrary(..))
 
 import Data.SBV.BitVectors.Data
 import Data.SBV.Utils.Boolean
+import Data.Bit
+import GHC.TypeNats
 
 liftSym1 :: (State -> (Bool, Size) -> SW -> IO SW) ->
             (Integer -> Integer) -> SBV b -> SBV b
@@ -91,71 +93,84 @@ mkSymOp1 = mkSymOp1SC (const Nothing)
 
 -- Symbolic-Word class instances
 
-genFree :: (Bool,Size) -> String -> Symbolic (SBV a)
-genFree s     = mkSymSBV s . Just
+inferShape :: HasSignAndSize a => a -> (Bool,Size)
+inferShape a = (hasSign a, sizeOf a)
 
-genFree_ :: (Bool,Size) -> Symbolic (SBV a)
-genFree_ s    = mkSymSBV s Nothing
+genFree :: forall a. HasSignAndSize a => String -> Symbolic (SBV a)
+genFree = mkSymSBV (inferShape (undefined :: a)) . Just
 
-genLiteral :: Integral a => (Bool,Size) -> a -> SBV b
-genLiteral s  = SBV s . Left . mkConstCW s
+genFree_ :: forall a. HasSignAndSize a => Symbolic (SBV a)
+genFree_ = mkSymSBV (inferShape (undefined :: a)) Nothing
+
+genLiteral :: forall a b. (HasSignAndSize b, Integral a) => a -> SBV b
+genLiteral = SBV s . Left . mkConstCW s
+  where s = inferShape (undefined :: b)
 
 genFromCW :: Integral a => CW -> a
 genFromCW x   = fromInteger (cwVal x)
 
 instance SymWord Bool where
-  free      = genFree (False, 1)
-  free_     = genFree_ (False, 1)
-  literal x = genLiteral (False, 1) (if x then (1::Integer) else 0)
+  free      = genFree
+  free_     = genFree_
+  literal x = genLiteral (if x then (1::Integer) else 0)
   fromCW    = cwToBool
 
 instance SymWord Word8 where
-  free    = genFree (False, 8)
-  free_   = genFree_ (False, 8)
-  literal = genLiteral (False, 8)
+  free    = genFree
+  free_   = genFree_
+  literal = genLiteral
   fromCW  = genFromCW
 
 instance SymWord Int8 where
-  free    = genFree (True, 8)
-  free_   = genFree_ (True, 8)
-  literal = genLiteral (True, 8)
+  free    = genFree
+  free_   = genFree_
+  literal = genLiteral
   fromCW  = genFromCW
 
 instance SymWord Word16 where
-  free    = genFree (False, 16)
-  free_   = genFree_ (False, 16)
-  literal = genLiteral (False, 16)
+  free    = genFree
+  free_   = genFree_
+  literal = genLiteral
   fromCW  = genFromCW
 
 instance SymWord Int16 where
-  free    = genFree (True, 16)
-  free_   = genFree_ (True, 16)
-  literal = genLiteral (True, 16)
+  free    = genFree
+  free_   = genFree_
+  literal = genLiteral
   fromCW  = genFromCW
 
 instance SymWord Word32 where
-  free    = genFree (False, 32)
-  free_   = genFree_ (False, 32)
-  literal = genLiteral (False, 32)
+  free    = genFree
+  free_   = genFree_
+  literal = genLiteral
   fromCW  = genFromCW
 
 instance SymWord Int32 where
-  free    = genFree (True, 32)
-  free_   = genFree_ (True, 32)
-  literal = genLiteral (True, 32)
+  free    = genFree
+  free_   = genFree_
+  literal = genLiteral
   fromCW  = genFromCW
 
 instance SymWord Word64 where
-  free    = genFree (False, 64)
-  free_   = genFree_ (False, 64)
-  literal = genLiteral (False, 64)
+  free    = genFree
+  free_   = genFree_
+  literal = genLiteral
   fromCW  = genFromCW
 
 instance SymWord Int64 where
-  free    = genFree (True, 64)
-  free_   = genFree_ (True, 64)
-  literal = genLiteral (True, 64)
+  free    = genFree
+  free_   = genFree_
+  literal = genLiteral
   fromCW  = genFromCW
+
+instance NatI n => SymWord (Bit n) where
+  free    = genFree
+  free_   = genFree_
+  literal = genLiteral
+  fromCW  = genFromCW
+
+
+
 
 
 -- | Symbolic Equality. Note that we can't use Haskell's 'Eq' class since Haskell insists on returning Bool
@@ -439,6 +454,10 @@ instance BVDivisible Word8 where
   bvQuotRem x 0 = (0, x)
   bvQuotRem x y = x `quotRem` y
 
+instance NatI n => BVDivisible (Bit n) where
+  bvQuotRem x 0 = (0, x)
+  bvQuotRem x y = x `quotRem` y
+
 instance BVDivisible Integer where
   bvQuotRem x 0 = (0, x)
   bvQuotRem x y = x `quotRem` y
@@ -459,6 +478,9 @@ instance BVDivisible SWord16 where
   bvQuotRem = liftQRem
 
 instance BVDivisible SWord8 where
+  bvQuotRem = liftQRem
+
+instance NatI n => BVDivisible (SBit n) where
   bvQuotRem = liftQRem
 
 liftQRem :: (SymWord a, Num a, BVDivisible a) => SBV a -> SBV a -> (SBV a, SBV a)
